@@ -5,7 +5,7 @@ import retrofit2.http.GET;
 
 public interface APIInterface {
 
-    @GET("/water_tank/readLast.php")
+    @GET("/water_tank/readAll.php")
     Call<WaterTankResponse> getLatestWaterLevel();
 
 }

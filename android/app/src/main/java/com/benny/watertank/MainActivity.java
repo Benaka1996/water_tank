@@ -2,16 +2,35 @@ package com.benny.watertank;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.res.Resources;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.View;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -20,52 +39,67 @@ import retrofit2.Response;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
-    private final Handler handler = new Handler();
-    private TextView sensarValue;
+    private final NotificationBroadcast notificationBroadcast = new NotificationBroadcast();
+
+    private RecyclerView recyclerView;
+
+    private final APIInterface apiInterface = APIClient.getClient().create(APIInterface.class);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setTheme(R.style.Theme_WaterTank);
         setContentView(R.layout.activity_main);
+        recyclerView = findViewById(R.id.historyList);
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getApplicationContext());
+        recyclerView.setLayoutManager(linearLayoutManager);
 
-        sensarValue = findViewById(R.id.sensor_value);
+        DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(getApplicationContext(), DividerItemDecoration.VERTICAL);
+        Resources.Theme theme = getTheme();
+        TypedValue typedValue = new TypedValue();
+        theme.resolveAttribute(R.attr.colorOnSecondary, typedValue, true);
+        dividerItemDecoration.setDrawable(new ColorDrawable(typedValue.data));
+        recyclerView.addItemDecoration(dividerItemDecoration);
+
+        WaterTankHistoryAdapter waterTankHistoryAdapter = new WaterTankHistoryAdapter(getApplicationContext());
+        recyclerView.setAdapter(waterTankHistoryAdapter);
 
         createNotificationChannel();
         subscribe();
+        fetchWaterTankData();
 
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                APIInterface apiInterface = APIClient.getClient().create(APIInterface.class);
-                apiInterface.getLatestWaterLevel().enqueue(new Callback<WaterTankResponse>() {
-                    @Override
-                    public void onResponse(Call<WaterTankResponse> call, Response<WaterTankResponse> response) {
-                        if (response.isSuccessful()) {
-                            WaterTankResponse body = response.body();
-                            ArrayList<WaterTank> waterTanks = body.waterTanks;
-                            if (!waterTanks.isEmpty()) {
-                                WaterTank waterTank = waterTanks.get(0);
-                                sensarValue.setText(waterTank.waterLevel);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<WaterTankResponse> call, Throwable t) {
-                        Log.d(TAG, "onFailure: " + call);
-                    }
-                });
-                handler.removeCallbacks(this);
-                handler.postDelayed(this, 5000);
-            }
-        });
+        LocalBroadcastManager.getInstance(getApplicationContext())
+                .registerReceiver(notificationBroadcast, new IntentFilter(NotificationBroadcast.ACTION));
 
         //FirebaseInstanceId.getInstance().getInstanceId().addOnSuccessListener(instanceIdResult -> Log.d(TAG, "onSuccess: " + instanceIdResult.getToken()));
+    }
+
+    public void fetchWaterTankData() {
+        apiInterface.getLatestWaterLevel().enqueue(new Callback<WaterTankResponse>() {
+            @Override
+            public void onResponse(Call<WaterTankResponse> call, Response<WaterTankResponse> response) {
+                if (response.isSuccessful()) {
+                    WaterTankResponse body = response.body();
+                    ArrayList<WaterTank> waterTanks = body.waterTanks;
+                    waterTanks.sort((waterTank1, waterTank2) -> Long.compare(Long.parseLong(waterTank2.timeStamp), Long.parseLong(waterTank1.timeStamp)));
+                    WaterTankHistoryAdapter waterTankHistoryAdapter = (WaterTankHistoryAdapter) recyclerView.getAdapter();
+                    if (waterTankHistoryAdapter != null) {
+                        waterTankHistoryAdapter.submitList(waterTanks);
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<WaterTankResponse> call, Throwable t) {
+                Log.d(TAG, "onFailure: " + call);
+            }
+        });
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        LocalBroadcastManager.getInstance(getApplicationContext()).unregisterReceiver(notificationBroadcast);
     }
 
     private void createNotificationChannel() {
@@ -89,6 +123,18 @@ public class MainActivity extends AppCompatActivity {
 
                 });
 
+    }
+
+    public class NotificationBroadcast extends BroadcastReceiver {
+        public static final String ACTION = "MESSAGE_RECEIVED";
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            fetchWaterTankData();
+            Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), defaultUri);
+            ringtone.play();
+        }
     }
 
 }
