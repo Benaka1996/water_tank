@@ -8,19 +8,13 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
+import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.View;
-import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -29,8 +23,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -108,8 +100,20 @@ public class MainActivity extends AppCompatActivity {
         CharSequence name = "FirebaseNotification";
         String description = "Firebase Notification Description";
         int importance = NotificationManager.IMPORTANCE_DEFAULT;
-        NotificationChannel channel = new NotificationChannel("101", name, importance);
+        Uri sound = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.tamacun);
+
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build();
+
+        NotificationChannel channel = new NotificationChannel("water_tank_id", name, importance);
         channel.setDescription(description);
+        channel.setSound(sound, audioAttributes);
+        channel.setVibrationPattern(new long[]{400, 400});
+        channel.enableVibration(true);
+        channel.enableLights(true);
+
         // Register the channel with the system; you can't change the importance
         // or other notification behaviors after this
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
@@ -131,9 +135,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             fetchWaterTankData();
-            Uri defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), defaultUri);
-            ringtone.play();
         }
     }
 

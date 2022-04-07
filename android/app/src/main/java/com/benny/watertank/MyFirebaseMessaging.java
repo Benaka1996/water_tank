@@ -2,6 +2,7 @@ package com.benny.watertank;
 
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -42,12 +43,11 @@ public class MyFirebaseMessaging extends FirebaseMessagingService {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "101")
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "water_tank_id")
                 .setSmallIcon(R.drawable.water_tank_icon)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setVibrate(new long[]{400, 400})
                 // Set the intent that will fire when the user taps the notification
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true);
