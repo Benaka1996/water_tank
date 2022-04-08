@@ -1,12 +1,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
+#include <LittleFS.h>
 
-String ssid = "UmmmAde";
-String password = "20120527385";
 const char* host = "rorschach1996.000webhostapp.com";
 bool accessMode = false;
 int oldTime = 0;
+bool retry = false;
+
+#define LED D0
 
 ESP8266WebServer server(80);
 
@@ -14,7 +16,35 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println("Water tank Audit");
+
+  if (!LittleFS.begin()) {
+    Serial.println("Error in File system");
+  }
+
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
+
+  String ssid = "";
+  String password = "";
+  boolean isPassword = false;
+
+  File file = LittleFS.open("/wifi.txt", "r");
+  while (file.available()) {
+    String value = String((char) file.read());
+    if (value == "\n") {
+      isPassword = true;
+      continue;
+    }
+    if (isPassword) {
+      password = password + value;
+    } else {
+      ssid = ssid + value;
+    }
+  }
+  file.close();
+
   connect(ssid, password);
+
   if (isConnected()) {
     return;
   }
@@ -24,25 +54,29 @@ void setup() {
 
 void loop() {
   server.handleClient();
-
-  if (!accessMode && !isConnected()) {
-    setAccessPoint();
-    delay(1000);
-  }
-  else if (isConnected()) {
+  if (isConnected()) {
     int water_level = analogRead(A0);
     Serial.println(water_level);
 
-    if (oldTime == 0 && (millis() - oldTime) >= 3600000) {
-      if (water_level >= 350) {
+    int blinkSize = water_level / 100;
+    for (int i = 0; i < blinkSize; i++) {
+      digitalWrite(LED, LOW);
+      delay(100);
+      digitalWrite(LED, HIGH);
+      delay(100);
+    }
+
+    if (retry || oldTime == 0 || (millis() - oldTime) >= 1800000) {
+      if (water_level >= 200) {
         oldTime = millis();
         WiFiClient client;
         const int httpPort = 80;
         if (!client.connect(host, httpPort)) {
           Serial.println("connection failed");
+          retry = true;
           return;
         }
-
+        retry = false;
         String url = "/water_tank/insert.php?water_level=" + String(water_level);
         Serial.print("Requesting URL: ");
         Serial.println(url);
@@ -60,9 +94,12 @@ void loop() {
         Serial.println("Updating water level to server");
       }
     }
-    delay(5000);
-  } else {
     delay(1000);
+  } else {
+    digitalWrite(LED, LOW);
+    delay(200);
+    digitalWrite(LED, HIGH);
+    delay(200);
   }
 
 }
@@ -97,7 +134,7 @@ bool isConnected() {
 
 bool checkConnection() {
   int count = 0;
-  while (count < 30) {
+  while (count < 100) {
     if (isConnected()) {
       accessMode = false;
       return true;
@@ -130,8 +167,16 @@ void launchWeb() {
     String password = server.arg("password");
 
     if (ssid.length() > 0 && password.length() > 0) {
+      LittleFS.remove("/wifi.txt");
       String content = "{\"Success\":\"Updating to new WiFi credentials, restarting the device\"}";
-      server.send(404, "application/json", content);
+      server.send(200, "application/json", content);
+      File file = LittleFS.open("/wifi.txt", "w");
+      file.print(ssid);
+      delay(1000);
+      file.print("\n");
+      file.print(password);
+      delay(1000);
+      file.close();
       connect(ssid, password);
     }
     else {
