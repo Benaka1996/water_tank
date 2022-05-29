@@ -1,14 +1,17 @@
+#include <Arduino_JSON.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
 #include <LittleFS.h>
 
+#define TX D1
+#define RX D0
+
 const char* host = "rorschach1996.000webhostapp.com";
 bool accessMode = false;
-int oldTime = 0;
+double totalSum = 0;
+int count = 0;
 bool retry = false;
-
-#define LED D0
 
 ESP8266WebServer server(80);
 
@@ -17,12 +20,12 @@ void setup() {
   Serial.setDebugOutput(true);
   Serial.println("Water tank Audit");
 
+  pinMode(TX, INPUT);
+  pinMode(RX, OUTPUT);
+
   if (!LittleFS.begin()) {
     Serial.println("Error in File system");
   }
-
-  pinMode(LED, OUTPUT);
-  digitalWrite(LED, HIGH);
 
   String ssid = "";
   String password = "";
@@ -55,53 +58,54 @@ void setup() {
 void loop() {
   server.handleClient();
   if (isConnected()) {
-    int water_level = analogRead(A0);
-    Serial.println(water_level);
+    if (retry || count == 50) {
+      WiFiClient client;
+      const int httpPort = 80;
+      if (!client.connect(host, httpPort)) {
+        Serial.println("connection failed");
+        retry = true;
+        return;
+      }
+      retry = false;
+      double averageValue = totalSum / count;
+      Serial.println("-----");
+      Serial.println("Average water level");
+      Serial.println(averageValue);
 
-    int blinkSize = water_level / 100;
-    for (int i = 0; i < blinkSize; i++) {
-      digitalWrite(LED, LOW);
+      String url = "/water_tank/update_status.php?type=water_level&value=" + String(averageValue);
+      Serial.print("Requesting URL: ");
+      Serial.println(url);
+
+      client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                   "Host: " + host + "\r\n" +
+                   "Connection: close\r\n\r\n");
       delay(100);
-      digitalWrite(LED, HIGH);
-      delay(100);
+
+      Serial.println();
+      Serial.println("Updating water level to server");
+      count = 0;
+      totalSum = 0;
+      delay(5000);
     }
+    else {
+      digitalWrite(RX, LOW);
+      delay(5);
+      digitalWrite(RX, HIGH);
+      delay(10);
+      digitalWrite(RX, LOW);
 
-    if (retry || oldTime == 0 || (millis() - oldTime) >= 1800000) {
-      if (water_level >= 200) {
-        oldTime = millis();
-        WiFiClient client;
-        const int httpPort = 80;
-        if (!client.connect(host, httpPort)) {
-          Serial.println("connection failed");
-          retry = true;
-          return;
-        }
-        retry = false;
-        String url = "/water_tank/insert.php?water_level=" + String(water_level);
-        Serial.print("Requesting URL: ");
-        Serial.println(url);
+      float duration = pulseIn(TX, HIGH);
 
-        client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-                     "Host: " + host + "\r\n" +
-                     "Connection: close\r\n\r\n");
-        delay(100);
-
-        while (client.available()) {
-          String line = client.readStringUntil('\r');
-          Serial.print(line);
-        }
-        Serial.println();
-        Serial.println("Updating water level to server");
+      Serial.print("Distance in cm: ");
+      double waterLevel = (duration / 2) * 0.0343;
+      Serial.println(waterLevel);
+      if (waterLevel > 20) {
+        totalSum = totalSum + waterLevel;
+        count++;
       }
     }
-    delay(1000);
-  } else {
-    digitalWrite(LED, LOW);
-    delay(200);
-    digitalWrite(LED, HIGH);
-    delay(200);
   }
-
+  delay(500);
 }
 
 void connect(String ssid, String password) {

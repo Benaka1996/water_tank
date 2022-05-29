@@ -32,11 +32,13 @@ if (isset($_GET['water_level'])) {
         echo json_encode($response);
     }
     
-    if($water_level > 300){
+    if($water_level >= 200){
         $to="/topics/water_tank";
         $data=array(
             'title'=>'Water Tank',
-            'body'=>'Water tank is full, turn off the motor!'
+            'body'=>'Water tank is full, turn off the motor!',
+            'sound' => 'tamacun.mp3',
+            'channel_id' => 'water_tank_id'
         );
         notify($to,$data);
         echo "Notification Sent";
