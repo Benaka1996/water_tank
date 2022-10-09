@@ -3,6 +3,8 @@ package com.benny.waterTank2;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,7 +29,6 @@ import waterTank2.R;
 
 public class MainFragment extends Fragment {
     public static final String TAG = "WaterTank";
-    private static final int TANK_HEIGHT = 68;
 
     private final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss a", Locale.getDefault());
     private final Gson gson = new Gson();
@@ -49,8 +50,9 @@ public class MainFragment extends Fragment {
                 WaterTankStatus waterTankStatus = waterTankStatusList.get(0);
 
                 double waterLevel = waterTankStatus.getWaterLevel() - 4.5;
-                double waterPercentage = (1 - (waterLevel / TANK_HEIGHT)) * 100;
+                double waterPercentage = (1 - (waterLevel / Constants.TANK_HEIGHT)) * 100;
                 double fillHeight = waterPercentage * tankContainerHeight / 100;
+                double litre = Math.PI * Math.pow(Constants.TANK_RADIUS, 2) * (Constants.TANK_HEIGHT - waterLevel) / 1000;
 
                 ViewGroup.LayoutParams waterLayoutParams = water.getLayoutParams();
                 waterLayoutParams.height = (int) fillHeight;
@@ -58,7 +60,8 @@ public class MainFragment extends Fragment {
 
                 waterLevelPercentage.setText(String.format(Locale.getDefault(), "Water Level : %.2f %%", waterPercentage));
                 timeStamp.setText(String.format("Read time : %s", simpleDateFormat.format(waterTankStatus.getTimeStamp())));
-                sensorReading.setText(String.format("Sensor value : %s cm", waterLevel));
+                sensorReading.setText(String.format(Locale.getDefault(), "Sensor value : %.2f cm", waterLevel));
+                waterLitre.setText(String.format(Locale.getDefault(), "Volume : %.2fL", litre));
             }
         }
     }
@@ -68,6 +71,7 @@ public class MainFragment extends Fragment {
     private View water;
     private TextView waterLevelPercentage;
     private TextView timeStamp;
+    private TextView waterLitre;
     private SharedPreferences waterTankPreference;
     private TextView sensorReading;
 
@@ -92,10 +96,14 @@ public class MainFragment extends Fragment {
         timeStamp = view.findViewById(R.id.read_time_text);
         water = view.findViewById(R.id.water);
         sensorReading = view.findViewById(R.id.sensor_reading);
+        waterLitre = view.findViewById(R.id.water_litre);
 
         String responseString = waterTankPreference.getString(Constants.WATER_TANK_RESPONSE, null);
         WaterTankResponse waterTankResponse = gson.fromJson(responseString, WaterTankResponse.class);
-        setWaterTankInfo(waterTankResponse);
+
+        new Handler().postDelayed(() -> {
+            setWaterTankInfo(waterTankResponse);
+        }, 500);
 
         waterTankViewModel.getWaterTankStatusLiveData().observe(getViewLifecycleOwner(), waterTankDataObserver);
 

@@ -3,6 +3,7 @@ package com.benny.waterTank2.viewmodel;
 import android.app.Application;
 import android.os.Handler;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
@@ -33,15 +34,17 @@ public class WaterTankViewModel extends AndroidViewModel {
                         WaterTankResponse waterTankResponse = response.body();
                         waterTankStatusMutableLiveData.setValue(waterTankResponse);
                         Log.d(TAG, "onResponse: " + waterTankResponse.toString());
+                    } else {
+                        Toast.makeText(getApplication().getApplicationContext(), "Connection failed", Toast.LENGTH_SHORT).show();
                     }
                 }
 
                 @Override
                 public void onFailure(Call<WaterTankResponse> call, Throwable t) {
-                    Log.d(TAG, "onFailure: " + t);
+                    Toast.makeText(getApplication().getApplicationContext(), "Something went wrong", Toast.LENGTH_SHORT).show();
                 }
             });
-            handler.postDelayed(this, 5000);
+            handler.postDelayed(this, 2500);
         }
     };
 

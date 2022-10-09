@@ -9,9 +9,9 @@
 
 const char* host = "rorschach1996.000webhostapp.com";
 bool accessMode = false;
-double totalSum = 0;
 int count = 0;
 bool retry = false;
+String sensorArray = "";
 
 ESP8266WebServer server(80);
 
@@ -67,12 +67,10 @@ void loop() {
         return;
       }
       retry = false;
-      double averageValue = totalSum / count;
-      Serial.println("-----");
-      Serial.println("Average water level");
-      Serial.println(averageValue);
 
-      String url = "/water_tank/update_status.php?type=water_level&value=" + String(averageValue);
+      Serial.println("-----");
+
+      String url = "/water_tank/update_sensor_data.php?sensor_readings=" + sensorArray;
       Serial.print("Requesting URL: ");
       Serial.println(url);
 
@@ -84,7 +82,7 @@ void loop() {
       Serial.println();
       Serial.println("Updating water level to server");
       count = 0;
-      totalSum = 0;
+      sensorArray = "";
       delay(5000);
     }
     else {
@@ -99,8 +97,8 @@ void loop() {
       Serial.print("Distance in cm: ");
       double waterLevel = (duration / 2) * 0.0343;
       Serial.println(waterLevel);
-      if (waterLevel > 20) {
-        totalSum = totalSum + waterLevel;
+      if (waterLevel > 19) {
+        sensorArray += String(waterLevel) + ",";
         count++;
       }
     }
